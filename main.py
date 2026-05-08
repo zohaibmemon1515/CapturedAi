@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw, ImageFont
 # =========================
 # PAGE CONFIG
 # =========================
-st.set_page_config(page_title="Captured Ai", page_icon="🖥️", layout="wide")
+st.set_page_config(page_title="CAPTURED AI", page_icon="🖥️", layout="wide")
 
 # =========================
 # PREMIUM LIGHT THEME CSS
@@ -917,8 +917,8 @@ def run_cpp(code, input_data=""):
 st.markdown("""
 <div class="app-header">
     <div>
-        <div class="app-title">Captured Ai</div>
-        <div class="app-subtitle">// Premium Task Images Generator — 96 Images</div>
+        <div class="app-title">🖥️ CAPTURED AI</div>
+        <div class="app-subtitle">// Premium C++ Lab Manual Generator — 96 Images</div>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -935,17 +935,10 @@ st.markdown("""
 # --- Student Info Card ---
 st.markdown('<div class="section-card"><div class="section-title">👤 Student Info</div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns([2, 3, 1])
+col1, col2 = st.columns([2, 1])
 with col1:
     name = st.text_input("Student Name", "Zohaib Memon", key="name", placeholder="Enter full name")
 with col2:
-    save_path = st.text_input(
-        "Full Save Path",
-        value=os.path.join(os.path.expanduser("~"), "Desktop", "Lab_Screenshots"),
-        key="savepath",
-        placeholder="e.g. C:/Users/YourName/Desktop/Lab_Screenshots"
-    )
-with col3:
     task_range = st.selectbox("Task Range", ["All 48", "01–17", "18–25", "26–35", "36–48"], key="range")
 
 st.markdown('</div>', unsafe_allow_html=True)
@@ -1081,27 +1074,23 @@ with col_btn1:
 with col_btn2:
     st.markdown(f"""
     <div style="padding-top: 12px; font-size: 0.82rem; color: #64748b; font-family: 'Sora', sans-serif;">
-        {len(task_ids)} tasks × 2 screenshots &nbsp;·&nbsp; Theme: <strong>{selected_tmpl}</strong> &nbsp;·&nbsp;
-        Path: <code style="background:#f1f5f9; padding:2px 6px; border-radius:5px; font-size:0.78rem;">{save_path}</code>
+        {len(task_ids)} tasks × 2 screenshots &nbsp;·&nbsp; Theme: <strong>{selected_tmpl}</strong>
+        &nbsp;·&nbsp; ZIP file download hogi browser se
     </div>
     """, unsafe_allow_html=True)
 
 # --- Generate Logic ---
 if generate:
-    # Validate path
-    path_valid = True
-    try:
-        os.makedirs(save_path, exist_ok=True)
-    except Exception as e:
-        st.error(f"❌ Cannot create folder at the given path: `{save_path}`\n\nError: {e}")
-        path_valid = False
+    import io
+    import zipfile
 
-    if path_valid:
-        progress = st.progress(0)
-        status_text = st.empty()
-        generated_count = 0
-        errors = []
+    progress = st.progress(0)
+    status_text = st.empty()
+    generated_count = 0
 
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for idx, tid in enumerate(task_ids):
             key = f"{tid:02d}"
             status_text.markdown(
@@ -1113,11 +1102,15 @@ if generate:
             full_code = build_cpp(body)
             formatted_code = format_cpp(full_code)
 
-            # Code screenshot
-            code_img = os.path.join(save_path, f"task_{key}_code.png")
-            create_code_screenshot(formatted_code, code_img, tid, f"Task {key} — {desc}", tmpl_name=selected_tmpl)
+            # --- Code screenshot → in-memory ---
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_code:
+                tmp_code_path = tmp_code.name
+            create_code_screenshot(formatted_code, tmp_code_path, tid, f"Task {key} — {desc}", tmpl_name=selected_tmpl)
+            with open(tmp_code_path, "rb") as f:
+                zf.writestr(f"task_{key}_code.png", f.read())
+            os.unlink(tmp_code_path)
 
-            # Build input
+            # --- Build input string ---
             input_str = ""
             if has_cin and key in cin_inputs:
                 vals = cin_inputs[key]
@@ -1135,23 +1128,36 @@ if generate:
             else:
                 output_display = output
 
-            output_img = os.path.join(save_path, f"task_{key}_output.png")
-            create_output_screenshot(output_display, output_img, tid, success, tmpl_name=selected_tmpl)
+            # --- Output screenshot → in-memory ---
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_out:
+                tmp_out_path = tmp_out.name
+            create_output_screenshot(output_display, tmp_out_path, tid, success, tmpl_name=selected_tmpl)
+            with open(tmp_out_path, "rb") as f:
+                zf.writestr(f"task_{key}_output.png", f.read())
+            os.unlink(tmp_out_path)
 
             generated_count += 2
             progress.progress((idx + 1) / len(task_ids))
 
-        status_text.empty()
-        progress.progress(1.0)
+    status_text.empty()
+    progress.progress(1.0)
+    zip_buffer.seek(0)
 
-        st.markdown(f"""
-        <div class="success-box">
-            ✅ &nbsp;<strong>{generated_count} images</strong> generated for <strong>{len(task_ids)} tasks</strong><br>
-            📁 &nbsp;Saved to: <code style="background:#dcfce7; padding:2px 8px; border-radius:6px;">{save_path}</code><br>
-            🎨 &nbsp;Theme used: <strong>{selected_tmpl}</strong><br>
-            🖼️ &nbsp;{len(task_ids)} Code Screenshots + {len(task_ids)} Output Screenshots
-        </div>
-        """, unsafe_allow_html=True)
+    zip_name = f"Lab_{name.replace(' ', '_')}_{selected_tmpl.replace(' ', '_')}.zip"
 
-        if errors:
-            st.warning(f"⚠️ {len(errors)} tasks had issues: {', '.join(errors)}")
+    st.markdown(f"""
+    <div class="success-box">
+        ✅ &nbsp;<strong>{generated_count} images</strong> generated for <strong>{len(task_ids)} tasks</strong><br>
+        🎨 &nbsp;Theme: <strong>{selected_tmpl}</strong><br>
+        🖼️ &nbsp;{len(task_ids)} Code Screenshots + {len(task_ids)} Output Screenshots<br>
+        ⬇️ &nbsp;Neeche Download button se ZIP save karo
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.download_button(
+        label=f"⬇️ Download {zip_name}",
+        data=zip_buffer,
+        file_name=zip_name,
+        mime="application/zip",
+        use_container_width=True,
+    )
